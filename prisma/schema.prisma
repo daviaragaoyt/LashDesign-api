@@ -1,0 +1,65 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["lash_design"]
+}
+
+model Pessoa {
+  id             Int       @id @default(autoincrement())
+  nome           String
+  telefone       String?
+  email          String?   @unique
+  senha          String // Campo para armazenar a senha (criptografada)
+  dataNascimento DateTime?
+  endereco       String?
+  role           Role      @default(CLIENTE)
+  refreshToken   String? // Adicionando refreshToken opcional
+
+  servicosOferecidos Servico[]     @relation("PrestadorServicos")
+  agendamentos       Agendamento[] @relation("ClienteAgendamentos")
+
+  @@map("pessoas")
+  @@schema("lash_design")
+}
+
+model Servico {
+  id          Int     @id @default(autoincrement())
+  nome        String
+  descricao   String?
+  preco       Float
+  duracao     Int // Duração em minutos
+  prestadorId Int // Relacionamento com o prestador de serviço
+
+  prestador   Pessoa        @relation("PrestadorServicos", fields: [prestadorId], references: [id])
+  Agendamento Agendamento[]
+
+  @@map("servicos") // Nome da tabela no banco
+  @@schema("lash_design") // Especificando o schema
+}
+
+model Agendamento {
+  id        Int      @id @default(autoincrement())
+  dataHora  DateTime
+  clienteId Int // Relacionamento com o cliente
+  servicoId Int // Relacionamento com o serviço
+
+  cliente Pessoa  @relation("ClienteAgendamentos", fields: [clienteId], references: [id])
+  servico Servico @relation(fields: [servicoId], references: [id])
+
+  @@map("agendamentos") // Nome da tabela no banco
+  @@schema("lash_design") // Especificando o schema
+}
+
+enum Role {
+  ADMIN
+  USER
+  CLIENTE
+  PRESTADOR
+
+  @@schema("lash_design") // Especificando o schema
+}

@@ -43,10 +43,11 @@ model Servico {
 }
 
 model Agendamento {
-  id        Int      @id @default(autoincrement())
-  dataHora  DateTime
-  clienteId Int // Relacionamento com o cliente
-  servicoId Int // Relacionamento com o serviço
+  id         Int      @id @default(autoincrement())
+  dataHora   DateTime
+  clienteId  Int // Relacionamento com o cliente
+  servicoId  Int // Relacionamento com o serviço
+  disponivel Boolean
 
   cliente Pessoa  @relation("ClienteAgendamentos", fields: [clienteId], references: [id])
   servico Servico @relation(fields: [servicoId], references: [id])

@@ -78,6 +78,7 @@ router.get('/agendamento/:id', async (req: any, res: any) => {
     }
 });
 
+//Cria um agendamento
 router.post('/agendamento', async (req: any, res: any) => {
     try {
         const newAgendamento = req.body;
@@ -114,6 +115,7 @@ router.post('/agendamento', async (req: any, res: any) => {
         const agendamentoCriado = await prisma.agendamento.create({
             data: {
                 dataHora: dataHoraAgendamento.toDate(),
+                disponivel: true,
                 clienteId: parseInt(newAgendamento.clienteId),
                 servicoId: parseInt(newAgendamento.servicoId),
             },
@@ -142,6 +144,7 @@ router.post('/agendamento', async (req: any, res: any) => {
         });
     }
 });
+
 
 router.put('/agendamento/:id', async (req: any, res: any) => {
     try {

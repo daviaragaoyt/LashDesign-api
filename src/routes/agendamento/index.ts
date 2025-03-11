@@ -78,7 +78,6 @@ router.get('/agendamento/:id', async (req: any, res: any) => {
     }
 });
 
-//Cria um agendamento
 router.post('/agendamento', async (req: any, res: any) => {
     try {
         const newAgendamento = req.body;
@@ -115,7 +114,7 @@ router.post('/agendamento', async (req: any, res: any) => {
         const agendamentoCriado = await prisma.agendamento.create({
             data: {
                 dataHora: dataHoraAgendamento.toDate(),
-                disponivel: true,
+                disponivel: false, // Define como false, pois o horário estará ocupado
                 clienteId: parseInt(newAgendamento.clienteId),
                 servicoId: parseInt(newAgendamento.servicoId),
             },
@@ -144,7 +143,6 @@ router.post('/agendamento', async (req: any, res: any) => {
         });
     }
 });
-
 
 router.put('/agendamento/:id', async (req: any, res: any) => {
     try {
@@ -193,6 +191,7 @@ router.put('/agendamento/:id', async (req: any, res: any) => {
                 dataHora: dataHoraFormatada ? dataHoraFormatada.toDate() : agendamentoExistente.dataHora,
                 clienteId: parseInt(updatedData.clienteId) || agendamentoExistente.clienteId,
                 servicoId: parseInt(updatedData.servicoId) || agendamentoExistente.servicoId,
+                disponivel: updatedData.disponivel !== undefined ? updatedData.disponivel : agendamentoExistente.disponivel,
             },
         });
 
@@ -219,6 +218,7 @@ router.put('/agendamento/:id', async (req: any, res: any) => {
         });
     }
 });
+
 
 // Deletar um agendamento
 router.delete('/agendamento/:id', async (req: any, res: any) => {

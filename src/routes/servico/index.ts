@@ -1,5 +1,6 @@
 import express from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { autenticar } from '../middleware'
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -76,12 +77,19 @@ router.get('/servico/:id', async (req: any, res: any) => {
     }
 });
 
+
 // Criar um novo serviço
-router.post('/servico', async (req: any, res: any) => {
+router.post('/servico', autenticar, async (req: any, res: any) => {
+    if (req.usuario.role !== 'PRESTADOR') {
+        return res.status(403).json({
+            status: 'error',
+            message: 'Apenas prestadores podem criar serviços.',
+        });
+    }
+
     try {
         const newServico = req.body;
 
-        // Validação básica dos campos obrigatórios
         if (!newServico.nome || !newServico.preco || !newServico.duracao || !newServico.prestadorId) {
             return res.status(400).json({
                 status: 'error',
@@ -93,10 +101,11 @@ router.post('/servico', async (req: any, res: any) => {
         const servicoCriado = await prisma.servico.create({
             data: {
                 nome: newServico.nome,
-                descricao: newServico.descricao || null, // Descrição é opcional
-                preco: parseFloat(newServico.preco), // Converte para número
-                duracao: parseInt(newServico.duracao), // Converte para número
-                prestadorId: parseInt(newServico.prestadorId), // Converte para número
+                descricao: newServico.descricao || null,
+                preco: parseFloat(newServico.preco),
+                duracao: parseInt(newServico.duracao),
+                imagem: newServico.imagem || null,
+                prestadorId: parseInt(newServico.prestadorId),
             },
         });
 
@@ -106,7 +115,6 @@ router.post('/servico', async (req: any, res: any) => {
         });
     } catch (err: any) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
             if (err.code === 'P2002') {
                 return res.status(409).json({
                     status: 'error',
@@ -114,8 +122,6 @@ router.post('/servico', async (req: any, res: any) => {
                 });
             }
         }
-
-        // Erro genérico
         res.status(500).json({
             status: 'error',
             message: 'Erro ao criar serviço',
@@ -123,7 +129,7 @@ router.post('/servico', async (req: any, res: any) => {
         });
     }
 });
-
+// Atualizar um serviço existente
 // Atualizar um serviço existente
 router.put('/servico/:id', async (req: any, res: any) => {
     try {
@@ -148,9 +154,10 @@ router.put('/servico/:id', async (req: any, res: any) => {
             data: {
                 nome: updatedData.nome || servicoExistente.nome,
                 descricao: updatedData.descricao || servicoExistente.descricao,
-                preco: parseFloat(updatedData.preco) || servicoExistente.preco,
-                duracao: parseInt(updatedData.duracao) || servicoExistente.duracao,
-                prestadorId: parseInt(updatedData.prestadorId) || servicoExistente.prestadorId,
+                preco: updatedData.preco ? parseFloat(updatedData.preco) : servicoExistente.preco,
+                duracao: updatedData.duracao ? parseInt(updatedData.duracao) : servicoExistente.duracao,
+                imagem: updatedData.imagem !== undefined ? updatedData.imagem : servicoExistente.imagem,
+                prestadorId: updatedData.prestadorId ? parseInt(updatedData.prestadorId) : servicoExistente.prestadorId,
             },
         });
 

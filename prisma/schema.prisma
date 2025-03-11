@@ -33,6 +33,7 @@ model Servico {
   descricao   String?
   preco       Float
   duracao     Int // Duração em minutos
+  imagem        String? // Campo para armazenar a imagem em base64
   prestadorId Int // Relacionamento com o prestador de serviço
 
   prestador   Pessoa        @relation("PrestadorServicos", fields: [prestadorId], references: [id])
@@ -45,15 +46,15 @@ model Servico {
 model Agendamento {
   id         Int      @id @default(autoincrement())
   dataHora   DateTime
-  clienteId  Int // Relacionamento com o cliente
-  servicoId  Int // Relacionamento com o serviço
-  disponivel Boolean
+  clienteId  Int
+  servicoId  Int
+  disponivel Boolean  @default(true) // Adicione isso
 
   cliente Pessoa  @relation("ClienteAgendamentos", fields: [clienteId], references: [id])
   servico Servico @relation(fields: [servicoId], references: [id])
 
-  @@map("agendamentos") // Nome da tabela no banco
-  @@schema("lash_design") // Especificando o schema
+  @@map("agendamentos")
+  @@schema("lash_design")
 }
 
 enum Role {

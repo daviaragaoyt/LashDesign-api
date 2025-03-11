@@ -14,6 +14,7 @@ CREATE TABLE "lash_design"."pessoas" (
     "dataNascimento" TIMESTAMP(3),
     "endereco" TEXT,
     "role" "lash_design"."Role" NOT NULL DEFAULT 'CLIENTE',
+    "refreshToken" TEXT,
 
     CONSTRAINT "pessoas_pkey" PRIMARY KEY ("id")
 );
@@ -36,6 +37,7 @@ CREATE TABLE "lash_design"."agendamentos" (
     "dataHora" TIMESTAMP(3) NOT NULL,
     "clienteId" INTEGER NOT NULL,
     "servicoId" INTEGER NOT NULL,
+    "disponivel" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "agendamentos_pkey" PRIMARY KEY ("id")
 );

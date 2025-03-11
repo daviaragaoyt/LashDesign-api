@@ -72,7 +72,6 @@ router.post('/login', async (req: any, res: any) => {
             where: { email },
         });
 
-        // Verifica se a pessoa existe
         if (!pessoa) {
             return res.status(404).json({
                 status: 'error',
@@ -80,7 +79,6 @@ router.post('/login', async (req: any, res: any) => {
             });
         }
 
-        // Compara a senha fornecida com a senha armazenada (criptografada)
         const senhaValida = await bcrypt.compare(senha, pessoa.senha);
 
         if (!senhaValida) {
@@ -407,58 +405,71 @@ router.get('/clientes', async (req: any, res: any) => {
 });
 
 // Criar uma nova pessoa
-router.post('/pessoa', async (req: any, res: any) => {
+// Criar uma nova pessoa
+router.post('/pessoa', async (req, res) => {
     try {
-        const newPessoa = req.body;
+        const { nome, email, senha, dataNascimento, telefone, endereco } = req.body;
 
         // Validação básica dos campos obrigatórios
-        if (!newPessoa.nome || !newPessoa.dataNascimento) {
+        if (!nome || !email || !senha || !dataNascimento) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Nome e data de nascimento são obrigatórios',
+                message: 'Nome, email, senha e data de nascimento são obrigatórios.',
             });
         }
 
-        // Formata a data de nascimento
-        const [dia, mes, ano] = newPessoa.dataNascimento.split('/');
-        const dataFormatada = new Date(`${ano}-${mes}-${dia}`);
+        // Validação de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Email inválido.',
+            });
+        }
+
+        // Converte a data para o formato adequado, se necessário
+        let parsedDate: Date;
+        if (dataNascimento.includes('/')) {
+            const [dia, mes, ano] = dataNascimento.split('/');
+            parsedDate = new Date(`${ano}-${mes}-${dia}`);
+        } else {
+            parsedDate = new Date(dataNascimento);
+        }
 
         // Criptografa a senha
-        const senhaCriptografada = await bcrypt.hash(newPessoa.senha, 10);
+        const senhaCriptografada = await bcrypt.hash(senha, 10);
 
         // Cria a pessoa no banco de dados
         const pessoaCriada = await prisma.pessoa.create({
             data: {
-                nome: newPessoa.nome,
-                dataNascimento: dataFormatada,
-                email: newPessoa.email,
-                endereco: newPessoa.endereco,
-                telefone: newPessoa.telefone,
-                senha: senhaCriptografada, // Armazena a senha criptografada
-                role: newPessoa.role || 'CLIENTE', // Define a role padrão como CLIENTE
+                nome,
+                email,
+                senha: senhaCriptografada,
+                dataNascimento: parsedDate, // Data formatada
+                telefone: telefone || null, // Telefone é opcional
+                endereco: endereco || null, // Endereço é opcional
+                role: 'CLIENTE', // Define a role como CLIENTE por padrão
             },
         });
 
+        // Retorna a pessoa criada
         res.status(201).json({
             status: 'success',
             data: pessoaCriada,
         });
-    } catch (err: any) {
-        if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
-            if (err.code === 'P2002') {
-                return res.status(409).json({
-                    status: 'error',
-                    message: 'Email já cadastrado',
-                });
-            }
+    } catch (error: any) {
+        if (error.code === 'P2002') { // Erro de violação de chave única (email já cadastrado)
+            return res.status(409).json({
+                status: 'error',
+                message: 'Email já cadastrado.',
+            });
         }
 
         // Erro genérico
         res.status(500).json({
             status: 'error',
-            message: 'Erro ao criar pessoa',
-            error: err.message,
+            message: 'Erro ao criar pessoa.',
+            error: error.message,
         });
     }
 });

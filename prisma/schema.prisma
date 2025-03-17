@@ -33,7 +33,7 @@ model Servico {
   descricao   String?
   preco       Float
   duracao     Int // Duração em minutos
-  imagem        String? // Campo para armazenar a imagem em base64
+  imagem      String? // Campo para armazenar a imagem em base64
   prestadorId Int // Relacionamento com o prestador de serviço
 
   prestador   Pessoa        @relation("PrestadorServicos", fields: [prestadorId], references: [id])
@@ -48,10 +48,10 @@ model Agendamento {
   dataHora   DateTime
   clienteId  Int
   servicoId  Int
-  disponivel Boolean  @default(true) // Adicione isso
+  disponivel Boolean  @default(true)
 
   cliente Pessoa  @relation("ClienteAgendamentos", fields: [clienteId], references: [id])
-  servico Servico @relation(fields: [servicoId], references: [id])
+  servico Servico @relation(fields: [servicoId], references: [id], onDelete: Cascade) // Aplicando CASCADE aqui
 
   @@map("agendamentos")
   @@schema("lash_design")

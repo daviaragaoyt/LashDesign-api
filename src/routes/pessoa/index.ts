@@ -405,7 +405,6 @@ router.get('/clientes', async (req: any, res: any) => {
 });
 
 // Criar uma nova pessoa
-// Criar uma nova pessoa
 router.post('/pessoa', async (req: any, res: any) => {
     try {
         const { nome, email, senha, dataNascimento, telefone, endereco } = req.body;

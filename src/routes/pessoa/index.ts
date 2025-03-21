@@ -79,6 +79,7 @@ router.post('/login', async (req: any, res: any) => {
             });
         }
 
+        // Verifica se a senha está correta
         const senhaValida = await bcrypt.compare(senha, pessoa.senha);
 
         if (!senhaValida) {
@@ -117,22 +118,22 @@ router.post('/login', async (req: any, res: any) => {
             data: {
                 accessToken,
                 refreshToken,
-                pessoa: {
+                user: {
                     id: pessoa.id,
                     nome: pessoa.nome,
                     email: pessoa.email,
-                    role: pessoa.role,
+                    role: pessoa.role, // Passa a role do usuário
                 },
             },
         });
-    } catch (err: any) {
+    } catch (err) {
         // Log de erro
-        console.error(`Erro ao fazer login: ${err.message}`);
+        console.error(`Erro ao fazer login: `);
 
         res.status(500).json({
             status: 'error',
             message: 'Erro ao fazer login',
-            error: err.message,
+            error: (err as Error).message,
         });
     }
 });

@@ -79,48 +79,56 @@ router.get('/servico/:id', async (req: any, res: any) => {
 // Criar um novo serviço
 router.post('/servico', async (req: any, res: any) => {
     try {
-        const newServico = req.body;
+        const { nome, descricao, preco, duracao, imagem, prestadorId } = req.body;
 
-        // Validação básica dos campos obrigatórios
-        if (!newServico.nome || !newServico.preco || !newServico.duracao || !newServico.prestadorId) {
+        // Validações básicas
+        if (!nome || !preco || !duracao || !prestadorId) {
             return res.status(400).json({
                 status: 'error',
                 message: 'Nome, preço, duração e ID do prestador são obrigatórios',
             });
         }
 
-        // Cria o serviço no banco de dados
-        const servicoCriado = await prisma.servico.create({
+        // Valida a imagem se existir
+        if (imagem && imagem.length > 2097152) { // 2MB
+            return res.status(400).json({
+                status: 'error',
+                message: 'A imagem é muito grande (máximo 2MB)',
+            });
+        }
+
+        // Cria o serviço
+        const servico = await prisma.servico.create({
             data: {
-                nome: newServico.nome,
-                descricao: newServico.descricao || null, // Descrição é opcional
-                imagem: newServico.imagem || null,
-                preco: parseFloat(newServico.preco), // Converte para número
-                duracao: parseInt(newServico.duracao), // Converte para número
-                prestadorId: parseInt(newServico.prestadorId), // Converte para número
+                nome,
+                descricao: descricao || null,
+                preco: Number(preco),
+                duracao: Number(duracao),
+                imagem: imagem || null,
+                prestadorId: Number(prestadorId),
             },
         });
 
         res.status(201).json({
             status: 'success',
-            data: servicoCriado,
+            data: servico,
         });
     } catch (err: any) {
+        console.error("Erro ao criar serviço:", err);
+
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
             if (err.code === 'P2002') {
-                return res.status(409).json({
+                return res.status(400).json({
                     status: 'error',
-                    message: 'Serviço já existe',
+                    message: 'Já existe um serviço com esses dados',
                 });
             }
         }
 
-        // Erro genérico
         res.status(500).json({
             status: 'error',
-            message: 'Erro ao criar serviço',
-            error: err.message,
+            message: 'Erro interno ao criar serviço',
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
     }
 });

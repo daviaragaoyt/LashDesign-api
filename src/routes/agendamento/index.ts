@@ -1,110 +1,169 @@
 import express from 'express';
-import { PrismaClient, Prisma, Role } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// Listar todas as pessoas
-router.get('/pessoa', async (req: any, res: any) => {
+// Listar todos os agendamentos
+router.get('/agendamento', async (req, res: any) => {
     try {
-        const pessoas = await prisma.pessoa.findMany({
+        const agendamentos = await prisma.agendamento.findMany({
             include: {
-                agendamentos: true,
-                servicosOferecidos: true,
+                cliente: true,
+                servico: true,
             },
         });
 
         res.status(200).json({
             status: 'success',
-            data: pessoas,
+            data: agendamentos,
         });
     } catch (err) {
         res.status(500).json({
             status: 'error',
-            message: 'Erro ao buscar pessoas',
+            message: 'Erro ao buscar agendamentos',
 
         });
     }
 });
 
-// Listar pessoa por ID
-router.get('/pessoa/:id', async (req: any, res: any) => {
+// Listar agendamento por ID
+router.get('/agendamento/:id', async (req: any, res: any) => {
     try {
         const { id } = req.params;
-        const pessoa = await prisma.pessoa.findUnique({
+        const agendamento = await prisma.agendamento.findUnique({
             where: { id: parseInt(id) },
-            select: {
-                id: true,
-                nome: true,
-                email: true,
-                telefone: true,
-                dataNascimento: true,
-                role: true,
-                endereco: true,
-                agendamentos: true,
-                servicosOferecidos: true,
+            include: {
+                cliente: true,
+                servico: true,
             },
         });
 
-        if (!pessoa) {
+        if (!agendamento) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Pessoa não encontrada',
+                message: 'Agendamento não encontrado',
             });
         }
 
         res.status(200).json({
             status: 'success',
-            data: pessoa,
+            data: agendamento,
         });
     } catch (err) {
         res.status(500).json({
             status: 'error',
-            message: 'Erro ao buscar pessoa',
+            message: 'Erro ao buscar agendamento',
 
         });
     }
 });
 
-// Atualizar role de uma pessoa
-router.patch('/pessoa/:id/role', async (req: any, res: any) => {
+// Criar um agendamento
+router.post('/agendamento', async (req, res: any) => {
     try {
-        const { id } = req.params;
-        const { role } = req.body;
-
-        if (!['ADMIN', 'USER', 'CLIENTE', 'PRESTADOR'].includes(role)) {
+        const newAgendamento = req.body;
+        if (!newAgendamento.dataHora || !newAgendamento.clienteId || !newAgendamento.servicoId) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Role inválida',
+                message: 'Data/hora, ID do cliente e ID do serviço são obrigatórios',
             });
         }
 
-        const pessoaExistente = await prisma.pessoa.findUnique({
-            where: { id: parseInt(id) },
-        });
-
-        if (!pessoaExistente) {
-            return res.status(404).json({
+        const dataHoraAgendamento = new Date(newAgendamento.dataHora);
+        if (isNaN(dataHoraAgendamento.getTime())) {
+            return res.status(400).json({
                 status: 'error',
-                message: 'Pessoa não encontrada',
+                message: 'Data/hora inválida.',
             });
         }
 
-        const pessoaAtualizada = await prisma.pessoa.update({
-            where: { id: parseInt(id) },
-            data: { role: role as Role },
+        if (dataHoraAgendamento < new Date()) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'A data/hora do agendamento já passou.',
+            });
+        }
+
+        const agendamentoCriado = await prisma.agendamento.create({
+            data: {
+                dataHora: dataHoraAgendamento,
+                disponivel: false,
+                clienteId: parseInt(newAgendamento.clienteId),
+                servicoId: parseInt(newAgendamento.servicoId),
+            },
         });
 
-        res.status(200).json({
+        res.status(201).json({
             status: 'success',
-            data: pessoaAtualizada,
+            data: agendamentoCriado,
         });
     } catch (err) {
         res.status(500).json({
             status: 'error',
-            message: 'Erro ao atualizar role',
+            message: 'Erro ao criar agendamento',
 
         });
+    }
+});
+
+// Atualizar um agendamento
+router.put('/agendamento/:id', async (req, res: any) => {
+    try {
+        const { id } = req.params;
+        const updatedData = req.body;
+        const agendamentoExistente = await prisma.agendamento.findUnique({ where: { id: parseInt(id) } });
+
+        if (!agendamentoExistente) {
+            return res.status(404).json({ status: 'error', message: 'Agendamento não encontrado' });
+        }
+
+        let dataHoraFormatada = updatedData.dataHora ? new Date(updatedData.dataHora) : null;
+        if (dataHoraFormatada && isNaN(dataHoraFormatada.getTime())) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Data/hora inválida.',
+            });
+        }
+
+        if (dataHoraFormatada && dataHoraFormatada < new Date()) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'A data/hora do agendamento já passou.',
+            });
+        }
+
+        const agendamentoAtualizado = await prisma.agendamento.update({
+            where: { id: parseInt(id) },
+            data: {
+                dataHora: dataHoraFormatada || agendamentoExistente.dataHora,
+                clienteId: parseInt(updatedData.clienteId) || agendamentoExistente.clienteId,
+                servicoId: parseInt(updatedData.servicoId) || agendamentoExistente.servicoId,
+                disponivel: updatedData.disponivel !== undefined ? updatedData.disponivel : agendamentoExistente.disponivel,
+            },
+        });
+
+        res.status(200).json({ status: 'success', data: agendamentoAtualizado });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: 'Erro ao atualizar agendamento' });
+    }
+});
+
+// Deletar um agendamento
+router.delete('/agendamento/:id', async (req, res: any) => {
+    try {
+        const { id } = req.params;
+        const agendamentoExistente = await prisma.agendamento.findUnique({ where: { id: parseInt(id) } });
+
+        if (!agendamentoExistente) {
+            return res.status(404).json({ status: 'error', message: 'Agendamento não encontrado' });
+        }
+
+        await prisma.agendamento.delete({ where: { id: parseInt(id) } });
+
+        res.status(200).json({ status: 'success', message: 'Agendamento deletado com sucesso' });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: 'Erro ao deletar agendamento' });
     }
 });
 

@@ -4,46 +4,48 @@ import { PrismaClient, Prisma } from '@prisma/client';
 const prisma = new PrismaClient();
 const router = express.Router();
 
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+
 // Listar todos os serviços
-router.get('/servico', async (req: any, res: any) => {
+router.get('/servico', async (req, res: any) => {
     try {
         const servicos = await prisma.servico.findMany({
             include: {
-                prestador: true, // Inclui informações do prestador de serviço
-                Agendamento: true, // Inclui informações dos agendamentos associados
+                prestador: true,
+                Agendamento: true,
             },
         });
 
         res.status(200).json({
             status: 'success',
-            data: servicos,
+            data: servicos.map(s => ({
+                ...s,
+                imagem: s.imagem ? '[base64_image]' : null
+            })),
         });
     } catch (err: any) {
+        console.error('Erro ao buscar serviços:', err);
         res.status(500).json({
             status: 'error',
             message: 'Erro ao buscar serviços',
-            error: err.message,
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
     }
 });
 
 // Listar serviço por ID
-router.get('/servico/:id', async (req: any, res: any) => {
+router.get('/servico/:id', async (req, res: any) => {
     try {
         const { id } = req.params;
 
-        // Busca o serviço no banco de dados
         const servico = await prisma.servico.findUnique({
-            where: {
-                id: parseInt(id),
-            },
+            where: { id: parseInt(id) },
             include: {
-                prestador: true, // Inclui informações do prestador de serviço
-                Agendamento: true, // Inclui informações dos agendamentos associados
+                prestador: true,
+                Agendamento: true,
             },
         });
 
-        // Verifica se o serviço foi encontrado
         if (!servico) {
             return res.status(404).json({
                 status: 'error',
@@ -51,14 +53,17 @@ router.get('/servico/:id', async (req: any, res: any) => {
             });
         }
 
-        // Retorna o serviço encontrado
         res.status(200).json({
             status: 'success',
-            data: servico,
+            data: {
+                ...servico,
+                imagem: servico.imagem ? '[base64_image]' : null
+            },
         });
     } catch (err: any) {
+        console.error('Erro ao buscar serviço:', err);
+
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
             if (err.code === 'P2025') {
                 return res.status(404).json({
                     status: 'error',
@@ -67,37 +72,36 @@ router.get('/servico/:id', async (req: any, res: any) => {
             }
         }
 
-        // Erro genérico
         res.status(500).json({
             status: 'error',
             message: 'Erro ao buscar serviço',
-            error: err.message,
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
     }
 });
 
 // Criar um novo serviço
-router.post('/servico', async (req: any, res: any) => {
+router.post('/servico', async (req, res: any) => {
     try {
         const { nome, descricao, preco, duracao, imagem, prestadorId } = req.body;
 
-        // Validações básicas
-        if (!nome || !preco || !duracao || !prestadorId) {
+        // Validações
+        if (!nome || typeof preco === 'undefined' || typeof duracao === 'undefined' || !prestadorId) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Nome, preço, duração e ID do prestador são obrigatórios',
+                message: 'Dados incompletos',
+                required: ['nome', 'preco', 'duracao', 'prestadorId']
             });
         }
 
-        // Valida a imagem se existir
-        if (imagem && imagem.length > 2097152) { // 2MB
-            return res.status(400).json({
+        if (imagem && imagem.length > MAX_IMAGE_SIZE) {
+            return res.status(413).json({
                 status: 'error',
-                message: 'A imagem é muito grande (máximo 2MB)',
+                message: 'Imagem muito grande (máximo 2MB)',
+                maxSize: MAX_IMAGE_SIZE
             });
         }
 
-        // Cria o serviço
         const servico = await prisma.servico.create({
             data: {
                 nome,
@@ -111,35 +115,43 @@ router.post('/servico', async (req: any, res: any) => {
 
         res.status(201).json({
             status: 'success',
-            data: servico,
+            data: {
+                ...servico,
+                imagem: servico.imagem ? '[base64_image]' : null
+            },
         });
     } catch (err: any) {
-        console.error("Erro ao criar serviço:", err);
+        console.error('Erro ao criar serviço:', err);
 
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
             if (err.code === 'P2002') {
+                return res.status(409).json({
+                    status: 'error',
+                    message: 'Serviço já existe',
+                });
+            }
+            if (err.code === 'P2003') {
                 return res.status(400).json({
                     status: 'error',
-                    message: 'Já existe um serviço com esses dados',
+                    message: 'Prestador não encontrado',
                 });
             }
         }
 
         res.status(500).json({
             status: 'error',
-            message: 'Erro interno ao criar serviço',
+            message: 'Erro ao criar serviço',
             error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
     }
 });
 
 // Atualizar um serviço existente
-router.put('/servico/:id', async (req: any, res: any) => {
+router.put('/servico/:id', async (req, res: any) => {
     try {
         const { id } = req.params;
-        const updatedData = req.body;
+        const { nome, descricao, preco, duracao, imagem, prestadorId } = req.body;
 
-        // Verifica se o serviço existe
         const servicoExistente = await prisma.servico.findUnique({
             where: { id: parseInt(id) },
         });
@@ -151,26 +163,37 @@ router.put('/servico/:id', async (req: any, res: any) => {
             });
         }
 
-        // Atualiza o serviço no banco de dados
+        if (imagem && imagem.length > MAX_IMAGE_SIZE) {
+            return res.status(413).json({
+                status: 'error',
+                message: 'Imagem muito grande (máximo 2MB)',
+                maxSize: MAX_IMAGE_SIZE
+            });
+        }
+
         const servicoAtualizado = await prisma.servico.update({
             where: { id: parseInt(id) },
             data: {
-                nome: updatedData.nome || servicoExistente.nome,
-                descricao: updatedData.descricao || servicoExistente.descricao,
-                imagem: updatedData.imagem || servicoExistente.imagem,
-                preco: parseFloat(updatedData.preco) || servicoExistente.preco,
-                duracao: parseInt(updatedData.duracao) || servicoExistente.duracao,
-                prestadorId: parseInt(updatedData.prestadorId) || servicoExistente.prestadorId,
+                nome: nome || servicoExistente.nome,
+                descricao: descricao ?? servicoExistente.descricao,
+                imagem: imagem ?? servicoExistente.imagem,
+                preco: preco ? Number(preco) : servicoExistente.preco,
+                duracao: duracao ? Number(duracao) : servicoExistente.duracao,
+                prestadorId: prestadorId ? Number(prestadorId) : servicoExistente.prestadorId,
             },
         });
 
         res.status(200).json({
             status: 'success',
-            data: servicoAtualizado,
+            data: {
+                ...servicoAtualizado,
+                imagem: servicoAtualizado.imagem ? '[base64_image]' : null
+            },
         });
     } catch (err: any) {
+        console.error('Erro ao atualizar serviço:', err);
+
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
             if (err.code === 'P2025') {
                 return res.status(404).json({
                     status: 'error',
@@ -179,21 +202,19 @@ router.put('/servico/:id', async (req: any, res: any) => {
             }
         }
 
-        // Erro genérico
         res.status(500).json({
             status: 'error',
             message: 'Erro ao atualizar serviço',
-            error: err.message,
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
     }
 });
 
 // Deletar um serviço
-router.delete('/servico/:id', async (req: any, res: any) => {
+router.delete('/servico/:id', async (req, res: any) => {
     try {
         const { id } = req.params;
 
-        // Verifica se o serviço existe
         const servicoExistente = await prisma.servico.findUnique({
             where: { id: parseInt(id) },
         });
@@ -206,7 +227,7 @@ router.delete('/servico/:id', async (req: any, res: any) => {
         }
 
         await prisma.servico.delete({
-            where: { id: Number(id) },
+            where: { id: parseInt(id) },
         });
 
         res.status(200).json({
@@ -214,9 +235,9 @@ router.delete('/servico/:id', async (req: any, res: any) => {
             message: 'Serviço deletado com sucesso',
         });
     } catch (err: any) {
-        console.log("Entrou no catch", err)
+        console.error('Erro ao deletar serviço:', err);
+
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Erros específicos do Prisma
             if (err.code === 'P2025') {
                 return res.status(404).json({
                     status: 'error',
@@ -225,13 +246,11 @@ router.delete('/servico/:id', async (req: any, res: any) => {
             }
         }
 
-        // Erro genérico
         res.status(500).json({
             status: 'error',
             message: 'Erro ao deletar serviço',
-            error: err.message,
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined,
         });
-
     }
 });
 

@@ -3,28 +3,42 @@ import express, { NextFunction, Request, Response } from 'express';
 import 'express-async-errors';
 import routes from './routes';
 
-
 const app = express();
 
-app.use(cors());
+// Configuração do CORS
+app.use(cors({
+    origin: '*', // Ou especifique seus domínios permitidos
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.use(express.json());
+// Aumente o limite para 10MB (ou o valor que precisar)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/api', routes)
+// Rotas da API
+app.use('/api', routes);
 
-app.get("/", async (req, res) => {
-    try {
-        res.json({
-            status: 200,
-            message: "Ok!"
-        });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
+// Rota de health check
+app.get("/", (req, res) => {
+    res.json({
+        status: 200,
+        message: "API is running!"
+    });
 });
 
+// Middleware de erro global
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
-    res.status(500).send(error.message);
-})
+    console.error('Global error handler:', error);
+
+    res.status(500).json({
+        status: 'error',
+        message: 'Internal Server Error',
+        ...(process.env.NODE_ENV === 'development' && {
+            error: error.message,
+            stack: error.stack
+        })
+    });
+});
 
 export default app;

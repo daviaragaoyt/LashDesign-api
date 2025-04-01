@@ -6,22 +6,33 @@ const router = express.Router();
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 
+// Helper para validar base64
+function isValidBase64(str: string) {
+    try {
+        return Buffer.from(str, 'base64').toString('base64') === str;
+    } catch (err) {
+        return false;
+    }
+}
+
 // Listar todos os serviços
-router.get('/servico', async (req, res: any) => {
+router.get('/servico', async (req, res) => {
     try {
         const servicos = await prisma.servico.findMany({
             include: {
-                prestador: true,
+                prestador: {
+                    select: {
+                        id: true,
+                        nome: true,
+                    },
+                },
                 Agendamento: true,
             },
         });
 
         res.status(200).json({
             status: 'success',
-            data: servicos.map(s => ({
-                ...s,
-                imagem: s.imagem ? '[base64_image]' : null
-            })),
+            data: servicos, // Agora retornamos a imagem real
         });
     } catch (err: any) {
         console.error('Erro ao buscar serviços:', err);
@@ -41,7 +52,12 @@ router.get('/servico/:id', async (req, res: any) => {
         const servico = await prisma.servico.findUnique({
             where: { id: parseInt(id) },
             include: {
-                prestador: true,
+                prestador: {
+                    select: {
+                        id: true,
+                        nome: true,
+                    },
+                },
                 Agendamento: true,
             },
         });
@@ -55,10 +71,7 @@ router.get('/servico/:id', async (req, res: any) => {
 
         res.status(200).json({
             status: 'success',
-            data: {
-                ...servico,
-                imagem: servico.imagem ? '[base64_image]' : null
-            },
+            data: servico, // Retorna a imagem real
         });
     } catch (err: any) {
         console.error('Erro ao buscar serviço:', err);
@@ -94,11 +107,32 @@ router.post('/servico', async (req, res: any) => {
             });
         }
 
-        if (imagem && imagem.length > MAX_IMAGE_SIZE) {
+        // Verificar se a imagem é base64 válida
+        if (imagem && !isValidBase64(imagem)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Formato de imagem inválido'
+            });
+        }
+
+        // Verificar tamanho da imagem
+        if (imagem && Buffer.byteLength(imagem, 'base64') > MAX_IMAGE_SIZE) {
             return res.status(413).json({
                 status: 'error',
                 message: 'Imagem muito grande (máximo 2MB)',
                 maxSize: MAX_IMAGE_SIZE
+            });
+        }
+
+        // Verificar se o prestador existe
+        const prestador = await prisma.pessoa.findUnique({
+            where: { id: Number(prestadorId) }
+        });
+
+        if (!prestador) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Prestador não encontrado'
             });
         }
 
@@ -115,10 +149,7 @@ router.post('/servico', async (req, res: any) => {
 
         res.status(201).json({
             status: 'success',
-            data: {
-                ...servico,
-                imagem: servico.imagem ? '[base64_image]' : null
-            },
+            data: servico, // Retorna o serviço completo com imagem
         });
     } catch (err: any) {
         console.error('Erro ao criar serviço:', err);

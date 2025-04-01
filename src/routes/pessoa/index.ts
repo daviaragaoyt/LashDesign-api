@@ -82,6 +82,93 @@ router.post('/logout', async (req: any, res: any) => {
     }
 });
 
+// Rota para verificar se o email existe e permitir redefinição de senha
+router.post('/pessoa/verify-email-for-reset', async (req: any, res: any) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Email é obrigatório',
+            });
+        }
+
+        // Verifica se o usuário existe
+        const pessoa = await prisma.pessoa.findUnique({
+            where: { email },
+            select: { email: true } // Retorna apenas o email por segurança
+        });
+
+        if (!pessoa) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Email não encontrado',
+            });
+        }
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Email verificado com sucesso',
+            data: { email: pessoa.email }
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            status: 'error',
+            message: 'Erro ao verificar email',
+            error: err.message,
+        });
+    }
+});
+
+// Rota para atualizar a senha diretamente (após verificação do email)
+router.post('/pessoa/update-password', async (req: any, res: any) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        if (!email || !newPassword) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Email e nova senha são obrigatórios',
+            });
+        }
+
+        // Verifica novamente se o usuário existe (segurança adicional)
+        const pessoa = await prisma.pessoa.findUnique({
+            where: { email },
+        });
+
+        if (!pessoa) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Email não encontrado',
+            });
+        }
+
+        // Criptografa a nova senha
+        const senhaCriptografada = await bcrypt.hash(newPassword, 10);
+
+        // Atualiza a senha
+        await prisma.pessoa.update({
+            where: { email },
+            data: {
+                senha: senhaCriptografada
+            },
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Senha atualizada com sucesso'
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            status: 'error',
+            message: 'Erro ao atualizar senha',
+            error: err.message,
+        });
+    }
+});
+
 // Listar todas as pessoas
 router.get('/pessoa', async (req: any, res: any) => {
     try {

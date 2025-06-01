@@ -9,19 +9,34 @@ datasource db {
   schemas  = ["lash_design"]
 }
 
+// MUDANÇA: Adicionado um Enum para padronizar os tipos de notificação.
+// Isso evita erros de digitação e deixa o código mais claro.
+enum TipoNotificacao {
+  AGENDAMENTO_CRIADO
+  AGENDAMENTO_CANCELADO
+  LEMBRETE_ANIVERSARIO
+
+  @@schema("lash_design")
+}
+
 model Pessoa {
   id             Int       @id @default(autoincrement())
   nome           String
   telefone       String?
   email          String?   @unique
-  senha          String // Campo para armazenar a senha (criptografada)
+  senha          String
   dataNascimento DateTime?
   endereco       String?
   role           Role      @default(CLIENTE)
-  refreshToken   String? // Adicionando refreshToken opcional
+  refreshToken   String?
 
   servicosOferecidos Servico[]     @relation("PrestadorServicos")
   agendamentos       Agendamento[] @relation("ClienteAgendamentos")
+
+  // MUDANÇA: Substituído o campo genérico `Notificacao` por dois campos explícitos.
+  // Isso nos permite saber exatamente quem enviou e quem recebeu a notificação.
+  notificacoesRecebidas Notificacao[] @relation("NotificacoesRecebidas")
+  notificacoesEnviadas  Notificacao[] @relation("NotificacoesEnviadas")
 
   @@map("pessoas")
   @@schema("lash_design")
@@ -32,15 +47,15 @@ model Servico {
   nome        String
   descricao   String?
   preco       Float
-  duracao     Int // Duração em minutos
-  imagem      String? // Campo para armazenar a imagem em base64
-  prestadorId Int // Relacionamento com o prestador de serviço
+  duracao     Int
+  imagem      String?
+  prestadorId Int
 
   prestador   Pessoa        @relation("PrestadorServicos", fields: [prestadorId], references: [id])
   Agendamento Agendamento[]
 
-  @@map("servicos") // Nome da tabela no banco
-  @@schema("lash_design") // Especificando o schema
+  @@map("servicos")
+  @@schema("lash_design")
 }
 
 model Agendamento {
@@ -51,9 +66,36 @@ model Agendamento {
   disponivel Boolean  @default(true)
 
   cliente Pessoa  @relation("ClienteAgendamentos", fields: [clienteId], references: [id])
-  servico Servico @relation(fields: [servicoId], references: [id], onDelete: Cascade) // Aplicando CASCADE aqui
+  servico Servico @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+
+  // MUDANÇA: Adicionada a relação de volta para Notificacao.
+  notificacoes Notificacao[]
 
   @@map("agendamentos")
+  @@schema("lash_design")
+}
+
+// MUDANÇA: Modelo `Notificacao` completamente reestruturado para ser mais descritivo.
+model Notificacao {
+  id          Int             @id @default(autoincrement())
+  mensagem    String
+  lida        Boolean         @default(false)
+  tipo        TipoNotificacao // Usando o Enum que criamos
+  dataCriacao DateTime        @default(now())
+
+  // Relação com quem recebe a notificação (ex: o prestador)
+  destinatario   Pessoa @relation("NotificacoesRecebidas", fields: [destinatarioId], references: [id], onDelete: Cascade)
+  destinatarioId Int
+
+  // Relação opcional com quem originou a ação (ex: o cliente que agendou)
+  remetente   Pessoa? @relation("NotificacoesEnviadas", fields: [remetenteId], references: [id], onDelete: SetNull)
+  remetenteId Int?
+
+  // Relação opcional com o agendamento específico
+  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+  agendamentoId Int?
+
+  @@map("notificacoes")
   @@schema("lash_design")
 }
 
@@ -63,5 +105,5 @@ enum Role {
   CLIENTE
   PRESTADOR
 
-  @@schema("lash_design") // Especificando o schema
+  @@schema("lash_design")
 }
